@@ -11,9 +11,10 @@ static const char *const TAG = "modbus_controller";
 void ModbusController::setup() { this->create_polling_commands_(); }
 
 void WriterDevice::warn_write_buffer_deprecated(const LogString *platform, uint16_t address) {
-  if (this->write_buffer_deprecated_warned_)
+  static bool warned = false;
+  if (warned)
     return;
-  this->write_buffer_deprecated_warned_ = true;
+  warned = true;
   ESP_LOGW(TAG,
            "Modbus %s (address 0x%X): filling the write_lambda buffer parameter is deprecated; call a write helper / "
            "queue_pdu() on the entity (item) instead. The buffer parameter is removed in 2027.3.0",

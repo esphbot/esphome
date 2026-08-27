@@ -255,10 +255,9 @@ class ControllerDevice : protected modbus::ModbusClientDevice {
 
   void notify_online_(std::span<const uint8_t> request_pdu);
 
-  /// Write-path state owned by WriterEntity's forwarders, stored here so both bools land in the base's
-  /// tail padding instead of adding a word to every writer entity. The warn flag leaves in 2027.3.0.
+  /// Write-path state owned by WriterEntity's forwarders, stored here so it lands in the base's tail
+  /// padding instead of adding a word to every writer entity.
   bool dispatched_{false};
-  bool write_buffer_deprecated_warned_{false};
   ModbusController *controller_{nullptr};
 };
 
@@ -280,9 +279,9 @@ class WriterDevice final : public ControllerDevice {
   bool dispatched() const { return this->dispatched_; }
   void set_dispatched() { this->dispatched_ = true; }
   void clear_dispatched() { this->dispatched_ = false; }
-  /// Warn once per entity that filling the write_lambda buffer parameter is deprecated (the entity is now the
+  /// Warn once that filling the write_lambda buffer parameter is deprecated (the entity is now the
   /// command - call a write helper / queue_pdu() on `item` instead). The buffer parameter is removed in 2027.3.0.
-  void warn_write_buffer_deprecated(const LogString *platform, uint16_t address);
+  static void warn_write_buffer_deprecated(const LogString *platform, uint16_t address);
 
  protected:
   // Only the write side forwards to the typed callbacks (for item->queue_pdu() replies): a poll parses
@@ -333,8 +332,8 @@ class WriterEntity {
   }
   void set_controller_(ModbusController *controller) { this->device_.set_controller(controller); }
   void clear_dispatched_() { this->device_.clear_dispatched(); }
-  void warn_write_buffer_deprecated_(const LogString *platform, uint16_t address) {
-    this->device_.warn_write_buffer_deprecated(platform, address);
+  static void warn_write_buffer_deprecated_(const LogString *platform, uint16_t address) {
+    WriterDevice::warn_write_buffer_deprecated(platform, address);
   }
 
  private:
