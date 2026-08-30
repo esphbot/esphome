@@ -71,10 +71,12 @@ void ModbusClientHub::loop() {
   this->Modbus::loop();
 
   // Send-wait watchdog: only the cheap time check runs at loop rate; expire_waiting_() looks the
-  // entry up and holds off if the response has started arriving.
-  if (this->waiting_for_response_ &&
-      this->last_receive_check_ - this->last_send_ > this->last_send_tx_offset_ + this->send_wait_time_us_) {
-    this->expire_waiting_();
+  // entry up and holds off if the response has started arriving. receive_bytes_() only stamps
+  // last_receive_check_ when the bus is active, so read the clock here rather than trust it.
+  if (this->waiting_for_response_) {
+    this->last_receive_check_ = micros();
+    if (this->last_receive_check_ - this->last_send_ > this->last_send_tx_offset_ + this->send_wait_time_us_)
+      this->expire_waiting_();
   }
 
   this->sweep_();  // deliver owed callbacks with the hub quiescent
@@ -164,8 +166,12 @@ bool ModbusClientHub::tx_buffer_empty() {
 }
 
 void Modbus::receive_bytes_() {
-  this->last_receive_check_ = micros();
   size_t bytes = this->available();
+  // An idle bus has no timestamp consumer: nothing to stamp against, and micros() is a hardware
+  // timer read (a trigger write plus a settle spin on the original ESP32), not a free counter load.
+  if (bytes == 0 && this->rx_buffer_.empty())
+    return;
+  this->last_receive_check_ = micros();
 
   if (bytes) {
     size_t buffer_size = this->rx_buffer_.size();
@@ -814,6 +820,11 @@ bool Modbus::send_frame_(const ModbusFrame &frame) {
 }
 
 void ModbusClientHub::send_next_frame_() {
+  // Nothing queued means nothing to select: return before tx_blocked(), whose available() takes a
+  // FreeRTOS critical section and whose tx_delay_remaining() spins on the hardware timer.
+  if (this->tx_buffer_.empty())
+    return;
+
   if (this->tx_blocked())
     return;
 
@@ -997,9 +1008,7 @@ bool ModbusDeviceCommand::timed_out() {
   return true;
 }
 
-void ModbusClientHub::sweep_() {
-  if (!this->sweep_needed_)
-    return;
+void ModbusClientHub::sweep_body_() {
   this->sweep_needed_ = false;
   // Serve only the entries present now: a callback may append (a re-send), but those sit beyond
   // work_set and are left for the next sweep, which bounds the work and is the termination argument.

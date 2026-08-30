@@ -278,7 +278,12 @@ class ModbusClientHub : public Modbus {
   void process_modbus_server_frame(uint8_t address, std::span<const uint8_t> pdu) override;
   void send_next_frame_();
   // Deliver owed callbacks from a quiescent hub and apply lifecycle bookkeeping; see FrameState.
-  void sweep_();
+  // Inline guard: a quiet loop() pass must not pay a call just to read the flag.
+  void sweep_() {
+    if (this->sweep_needed_)
+      this->sweep_body_();
+  }
+  void sweep_body_();
   // The selection function: best READY entry (ordered by priority; FIFO by seq within each group), or nullptr.
   ModbusDeviceCommand *select_next_ready_();
   // Locate the single entry waiting for a response (WAITING/INTERRUPTED/WAITING_RETIRED/INTERRUPTED_RETIRED).
