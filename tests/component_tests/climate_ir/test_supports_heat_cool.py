@@ -10,10 +10,9 @@ import pytest
 
 
 def _emitted_value(main_cpp: str) -> str:
-    """Return the argument of the generated set_supports_heat_cool() call."""
+    """Return the effective HEAT_COOL value; the C++ default (true) emits no call."""
     match = re.search(r"set_supports_heat_cool\((true|false)\)", main_cpp)
-    assert match, "set_supports_heat_cool() call not found"
-    return match.group(1)
+    return match.group(1) if match else "true"
 
 
 @pytest.mark.parametrize(

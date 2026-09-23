@@ -66,13 +66,13 @@ async def register_climate_ir(var: MockObj, config: ConfigType) -> None:
     await remote_base.register_transmittable(var, config)
     supports_cool = config[CONF_SUPPORTS_COOL]
     supports_heat = config[CONF_SUPPORTS_HEAT]
-    cg.add(var.set_supports_cool(supports_cool))
-    cg.add(var.set_supports_heat(supports_heat))
-    cg.add(
-        var.set_supports_heat_cool(
-            config.get(CONF_SUPPORTS_HEAT_COOL, supports_cool and supports_heat)
-        )
-    )
+    # The C++ defaults are all true, so only a disabled mode needs a call.
+    if not supports_cool:
+        cg.add(var.set_supports_cool(False))
+    if not supports_heat:
+        cg.add(var.set_supports_heat(False))
+    if not config.get(CONF_SUPPORTS_HEAT_COOL, supports_cool and supports_heat):
+        cg.add(var.set_supports_heat_cool(False))
     if remote_base.CONF_RECEIVER_ID in config:
         await remote_base.register_listener(var, config)
     if sensor_id := config.get(CONF_SENSOR):

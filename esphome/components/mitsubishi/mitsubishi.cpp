@@ -63,17 +63,17 @@ climate::ClimateTraits MitsubishiClimate::traits() {
   traits.set_visual_temperature_step(1.0f);
   traits.set_supported_modes({climate::CLIMATE_MODE_OFF});
 
-  if (this->supports_cool_)
+  if (this->modes_.count(climate::CLIMATE_MODE_COOL))
     traits.add_supported_mode(climate::CLIMATE_MODE_COOL);
-  if (this->supports_heat_)
+  if (this->modes_.count(climate::CLIMATE_MODE_HEAT))
     traits.add_supported_mode(climate::CLIMATE_MODE_HEAT);
 
-  if (this->supports_cool_ && this->supports_heat_)
+  if (this->modes_.count(climate::CLIMATE_MODE_COOL) && this->modes_.count(climate::CLIMATE_MODE_HEAT))
     traits.add_supported_mode(climate::CLIMATE_MODE_HEAT_COOL);
 
-  if (this->supports_dry_)
+  if (this->modes_.count(climate::CLIMATE_MODE_DRY))
     traits.add_supported_mode(climate::CLIMATE_MODE_DRY);
-  if (this->supports_fan_only_)
+  if (this->modes_.count(climate::CLIMATE_MODE_FAN_ONLY))
     traits.add_supported_mode(climate::CLIMATE_MODE_FAN_ONLY);
 
   // Default to only 3 levels in ESPHome even if most unit supports 4. The 3rd level is not used.
@@ -142,7 +142,7 @@ void MitsubishiClimate::transmit_state() {
     default:
       remote_state[6] = MITSUBISHI_MODE_COOL;
       remote_state[8] = MITSUBISHI_MODE_A_COOL;
-      if (this->supports_heat_) {
+      if (this->modes_.count(climate::CLIMATE_MODE_HEAT)) {
         remote_state[6] = MITSUBISHI_MODE_HEAT;
         remote_state[8] = MITSUBISHI_MODE_A_HEAT;
       }

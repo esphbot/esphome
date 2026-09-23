@@ -8,7 +8,7 @@ static const char *const TAG = "gree.climate";
 climate::ClimateTraits GreeClimate::traits() {
   auto t = climate_ir::ClimateIR::traits();
   // ClimateIR unconditionally includes HEAT_COOL in the base mode set; remove it when heat is not supported.
-  if (!this->supports_heat_) {
+  if (!this->modes_.count(climate::CLIMATE_MODE_HEAT)) {
     auto modes = t.get_supported_modes();
     modes.erase(climate::CLIMATE_MODE_HEAT_COOL);
     t.set_supported_modes(modes);
