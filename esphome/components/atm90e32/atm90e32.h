@@ -37,6 +37,14 @@ enum class OffsetCalibrationType : uint8_t {
   OFFSET_CALIBRATION_TYPE_POWER,
 };
 
+enum class CalibrationKind : uint8_t {
+  CALIBRATION_KIND_OFFSET,
+  CALIBRATION_KIND_POWER_OFFSET,
+  CALIBRATION_KIND_GAIN,
+};
+
+static constexpr size_t CALIBRATION_PREF_SIZE = sizeof(OffsetCalibration[3]);
+
 class ATM90E32Component : public PollingComponent,
                           public spi::SPIDevice<spi::BIT_ORDER_MSB_FIRST, spi::CLOCK_POLARITY_HIGH,
                                                 spi::CLOCK_PHASE_TRAILING, spi::DATA_RATE_1MHZ> {
@@ -198,9 +206,18 @@ class ATM90E32Component : public PollingComponent,
   void set_publish_interval_flag_(bool flag) { publish_interval_flag_ = flag; };
   void restore_offset_calibrations_(OffsetCalibrationType type);
   void restore_gain_calibrations_();
-  void finish_gain_calibration_(const GainCalibration (&previous)[3], bool previous_restored);
+  // Verifies the registers, saves the new values, and rolls chip and stored values back on failure.
+  void finish_calibration_(const void *previous, bool previous_restored, CalibrationKind kind);
+  void finish_gain_calibration_(const GainCalibration (&previous)[3], bool previous_restored) {
+    this->finish_calibration_(previous, previous_restored, CalibrationKind::CALIBRATION_KIND_GAIN);
+  }
   void finish_offset_calibration_(const OffsetCalibration (&previous)[3], bool previous_restored,
-                                  OffsetCalibrationType type);
+                                  OffsetCalibrationType type) {
+    this->finish_calibration_(previous, previous_restored,
+                              type == OffsetCalibrationType::OFFSET_CALIBRATION_TYPE_POWER
+                                  ? CalibrationKind::CALIBRATION_KIND_POWER_OFFSET
+                                  : CalibrationKind::CALIBRATION_KIND_OFFSET);
+  }
   void write_offsets_to_registers_(uint8_t phase, int16_t first_offset, int16_t second_offset,
                                    OffsetCalibrationType type);
   void write_gains_to_registers_();
