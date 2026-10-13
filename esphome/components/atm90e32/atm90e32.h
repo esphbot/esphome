@@ -27,8 +27,6 @@ struct GainCalibration {
   uint16_t current_gain{1};
 };
 
-static constexpr GainCalibration GAIN_CALIBRATION_CLEARED{0, 0};
-
 static_assert(sizeof(OffsetCalibration[3]) == 12, "Offset calibration preference layout must remain compatible");
 static_assert(sizeof(GainCalibration[3]) == 12, "Gain calibration preference layout must remain compatible");
 
@@ -206,6 +204,17 @@ class ATM90E32Component : public PollingComponent,
   void set_publish_interval_flag_(bool flag) { publish_interval_flag_ = flag; };
   void restore_offset_calibrations_(OffsetCalibrationType type);
   void restore_gain_calibrations_();
+  // The state one calibration kind owns: live values, stored copy and status flags.
+  struct CalibrationSlot {
+    const uint8_t *values;
+    ESPPreferenceObject *preference;
+    bool *has_stored;
+    bool *restored;
+    bool *mismatches;
+  };
+  CalibrationSlot calibration_slot_(CalibrationKind kind);
+  // Stores cleared values and resets the status flags; returns false when the save or sync failed.
+  bool clear_stored_calibration_(CalibrationKind kind);
   // Verifies the registers, saves the new values, and rolls chip and stored values back on failure.
   void finish_calibration_(const void *previous, bool previous_restored, CalibrationKind kind);
   void finish_gain_calibration_(const GainCalibration (&previous)[3], bool previous_restored) {
