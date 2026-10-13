@@ -549,9 +549,7 @@ TEST_P(ATM90E32CalibrationPersistence, RestoreVerifiesStoredValuesAndConfigFallb
         if (!restored)
           expect_previous_runtime_values(component, kind);
         if (corrupt) {
-          EXPECT_NE(output.find(kind.gain ? "config readback verification failed"
-                                          : "config fallback both failed verification"),
-                    std::string::npos);
+          EXPECT_NE(output.find("config fallback both failed verification"), std::string::npos);
         } else if (drop) {
           EXPECT_NE(output.find("config values verified"), std::string::npos);
         }

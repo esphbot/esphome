@@ -13,6 +13,8 @@ static const LogString *offset_calibration_name(bool power_offsets) {
   return power_offsets ? LOG_STR("Power offset") : LOG_STR("Offset");
 }
 
+static const LogString *gain_calibration_name() { return LOG_STR("Gain"); }
+
 static uint32_t pref_hash(const char *prefix, const char *name_space) {
   auto hash = fnv1_hash(prefix);
   return fnv1_hash_extend(hash, name_space);
@@ -747,6 +749,7 @@ void ATM90E32Component::run_gain_calibrations() {
 
 void ATM90E32Component::finish_gain_calibration_(const GainCalibration (&previous)[3], bool previous_restored) {
   const char *cs = this->get_calibration_id_();
+  const LogString *name = gain_calibration_name();
   const bool writes_verified = this->verify_gain_writes_();
   const bool previous_has_stored = this->has_stored_gain_calibration_;
   GainCalibration previous_stored[3]{GAIN_CALIBRATION_CLEARED, GAIN_CALIBRATION_CLEARED, GAIN_CALIBRATION_CLEARED};
@@ -755,10 +758,10 @@ void ATM90E32Component::finish_gain_calibration_(const GainCalibration (&previou
     preference_write_allowed = this->gain_calibration_pref_.load(&previous_stored);
     if (!preference_write_allowed) {
       ESP_LOGE(TAG,
-               "[CALIBRATION][%s] Failed to load stored gain calibration "
+               "[CALIBRATION][%s] Failed to load stored %s calibration "
                "values; refusing to overwrite them. "
-               "Clear stored gain calibrations and retry.",
-               cs);
+               "Clear stored %s calibrations and retry.",
+               cs, LOG_STR_ARG(name), LOG_STR_ARG(name));
     }
   }
 
@@ -777,12 +780,13 @@ void ATM90E32Component::finish_gain_calibration_(const GainCalibration (&previou
     this->update_using_saved_calibrations_();
     for (bool &phase : this->gain_calibration_mismatch_)
       phase = false;
-    ESP_LOGI(TAG, "[CALIBRATION][%s] Gain calibration saved to memory. Gain calibration completed and verified.", cs);
+    ESP_LOGI(TAG, "[CALIBRATION][%s] %s calibration saved to memory. %s calibration completed and verified.", cs,
+             LOG_STR_ARG(name), LOG_STR_ARG(name));
     return;
   }
 
   if (writes_verified && preference_write_attempted) {
-    ESP_LOGE(TAG, "[CALIBRATION][%s] Failed to save gain calibration to memory!", cs);
+    ESP_LOGE(TAG, "[CALIBRATION][%s] Failed to save %s calibration to memory!", cs, LOG_STR_ARG(name));
   }
 
   for (uint8_t phase = 0; phase < 3; phase++)
@@ -794,7 +798,7 @@ void ATM90E32Component::finish_gain_calibration_(const GainCalibration (&previou
     const bool rollback_saved = this->gain_calibration_pref_.save(&previous_stored);
     const bool rollback_synced = global_preferences->sync();
     if (!rollback_saved || !rollback_synced) {
-      ESP_LOGE(TAG, "[CALIBRATION][%s] Failed to persist restored gain calibration values!", cs);
+      ESP_LOGE(TAG, "[CALIBRATION][%s] Failed to persist restored %s calibration values!", cs, LOG_STR_ARG(name));
     }
   }
 
@@ -804,10 +808,11 @@ void ATM90E32Component::finish_gain_calibration_(const GainCalibration (&previou
   if (!rollback_verified) {
     for (bool &phase : this->gain_calibration_mismatch_)
       phase = false;
-    ESP_LOGE(TAG, "[CALIBRATION][%s] Gain calibration failed; rollback readback verification failed.", cs);
+    ESP_LOGE(TAG, "[CALIBRATION][%s] %s calibration failed; rollback readback verification failed.", cs,
+             LOG_STR_ARG(name));
     return;
   }
-  ESP_LOGE(TAG, "[CALIBRATION][%s] Gain calibration failed; previous values restored.", cs);
+  ESP_LOGE(TAG, "[CALIBRATION][%s] %s calibration failed; previous values restored.", cs, LOG_STR_ARG(name));
 }
 
 void ATM90E32Component::finish_offset_calibration_(const OffsetCalibration (&previous)[3], bool previous_restored,
@@ -1050,9 +1055,11 @@ void ATM90E32Component::restore_gain_calibrations_() {
   this->restored_gain_calibration_ = false;
   this->update_using_saved_calibrations_();
   if (fallback_verified) {
-    ESP_LOGE(TAG, "[CALIBRATION][%s] Gain calibration restore failed verification; config values verified.", cs);
+    ESP_LOGE(TAG, "[CALIBRATION][%s] %s calibration restore failed verification; config values verified.", cs,
+             LOG_STR_ARG(gain_calibration_name()));
   } else {
-    ESP_LOGE(TAG, "[CALIBRATION][%s] Gain calibration restore failed; config readback verification failed.", cs);
+    ESP_LOGE(TAG, "[CALIBRATION][%s] %s calibration restore and config fallback both failed verification.", cs,
+             LOG_STR_ARG(gain_calibration_name()));
   }
 }
 
