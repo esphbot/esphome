@@ -125,6 +125,17 @@ void AddressableLight::limit_power_() {
 
 void AddressableLight::call_setup() {
   this->setup();
+#ifdef USE_LIGHT_LEGACY_VIEW
+  // Remove before 2027.5.0
+  if (this->accessor_ == &this->legacy_accessor_) {
+    if (this->is_failed()) {
+      this->accessor_ = &NullColorAccessor::instance;
+    } else {
+      ESP_LOGW(TAG, "'%s' uses get_view_internal(), which is removed in 2027.5.0; set accessor_ in setup() instead",
+               this->state_parent_ == nullptr ? "" : LOG_STR_ARG(this->state_parent_->get_log_name()));
+    }
+  }
+#endif
 #ifdef USE_LIGHT_POWER_ESTIMATION
   if (this->power_estimation_ != nullptr)
     this->setup_power_budget_();

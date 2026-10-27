@@ -152,7 +152,49 @@ class AddressableLight : public LightOutput, public Component {
   float draw_ma_(const uint32_t sums[4]) const;
 #endif
 
+#ifdef USE_LIGHT_LEGACY_VIEW
+  // Remove before 2027.5.0
+  /// Routes every access through get_view_internal() for a light that never sets accessor_.
+  class LegacyViewAccessor final : public ESPColorAccessor {
+   public:
+    explicit LegacyViewAccessor(const AddressableLight *parent) : parent_(parent) {}
+
+    Color get(int32_t index) const override { return this->view_(index).get(); }
+    Color get_raw(int32_t index) const override { return this->view_(index).get_raw(); }
+    uint8_t get_red(int32_t index) const override { return this->view_(index).get_red(); }
+    uint8_t get_green(int32_t index) const override { return this->view_(index).get_green(); }
+    uint8_t get_blue(int32_t index) const override { return this->view_(index).get_blue(); }
+    uint8_t get_white(int32_t index) const override { return this->view_(index).get_white(); }
+    uint8_t get_effect_data(int32_t index) const override { return this->view_(index).get_effect_data(); }
+
+    void set(int32_t index, Color color) override { this->view_(index).set(color); }
+    void set_raw(int32_t index, Color raw_color) override { this->view_(index).set_raw(raw_color); }
+    void set_red(int32_t index, uint8_t red) override { this->view_(index).set_red(red); }
+    void set_green(int32_t index, uint8_t green) override { this->view_(index).set_green(green); }
+    void set_blue(int32_t index, uint8_t blue) override { this->view_(index).set_blue(blue); }
+    void set_white(int32_t index, uint8_t white) override { this->view_(index).set_white(white); }
+    void set_effect_data(int32_t index, uint8_t value) override { this->view_(index).set_effect_data(value); }
+
+#if defined(USE_LIGHT_PARTITION) && defined(USE_LIGHT_POWER_ESTIMATION)
+    const ESPColorCorrection *get_color_correction_internal(int32_t index) const override {
+      return this->view_(index).get_color_correction_internal();
+    }
+#endif
+
+   protected:
+    ESPColorView view_(int32_t index) const { return this->parent_->get_view_internal(index); }
+
+    const AddressableLight *const parent_;
+  };
+
+  /// Deprecated: set accessor_ instead. Only called for a light that has not set accessor_.
+  virtual ESPColorView get_view_internal(int32_t index) const { return {&NullColorAccessor::instance, index}; }
+
+  LegacyViewAccessor legacy_accessor_{this};
+  ESPColorAccessor *accessor_{&this->legacy_accessor_};
+#else
   ESPColorAccessor *accessor_{&NullColorAccessor::instance};
+#endif
   ESPColorCorrection correction_{};
   LightState *state_parent_{nullptr};
 #ifdef USE_LIGHT_POWER_ESTIMATION

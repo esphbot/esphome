@@ -2,7 +2,9 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 import enum
 import logging
+from pathlib import Path
 
+from esphome import loader
 import esphome.automation as auto
 import esphome.codegen as cg
 from esphome.components import power_supply
@@ -28,6 +30,7 @@ from esphome.const import (
     CONF_ON_TURN_OFF,
     CONF_ON_TURN_ON,
     CONF_OUTPUT_ID,
+    CONF_PLATFORM,
     CONF_POWER_SUPPLY,
     CONF_RESTORE_MODE,
     CONF_RESTORE_STATE,
@@ -724,7 +727,21 @@ async def setup_light_core_(light_var, config, output_var):
     await entity_helpers.setup_entity_integrations(light_var, config)
 
 
+def _is_out_of_tree_platform(platform: str) -> bool:
+    manifest = loader.get_platform(DOMAIN, platform)
+    module_file = getattr(getattr(manifest, "module", None), "__file__", None)
+    return module_file is None or not Path(module_file).resolve().is_relative_to(
+        loader.CORE_COMPONENTS_PATH
+    )
+
+
 async def register_light(output_var, config):
+    # Remove before 2027.5.0
+    # Lights from external components may still override get_view_internal()
+    if (platform := config.get(CONF_PLATFORM)) is not None and _is_out_of_tree_platform(
+        platform
+    ):
+        cg.add_define("USE_LIGHT_LEGACY_VIEW")
     light_var = cg.new_Pvariable(config[CONF_ID], output_var)
     queue_entity_register("light", config)
     CORE.register_platform_component("light", light_var)

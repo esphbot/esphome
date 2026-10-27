@@ -179,6 +179,88 @@ class CorrectedBufferColorAccessor final : public BufferColorAccessor {
   const ESPColorCorrection *const color_correction_;
 };
 
+#ifdef USE_LIGHT_LEGACY_VIEW
+// Remove before 2027.5.0
+/// One pixel described by the six pointers of the deprecated ESPColorView constructor; the index is ignored.
+/// Only the scratch instance is used, and it is valid until the next ESPColorView is built from pointers.
+class PointerColorAccessor final : public ESPColorAccessor {
+ public:
+  static PointerColorAccessor scratch;
+
+  PointerColorAccessor *bind(uint8_t *red, uint8_t *green, uint8_t *blue, uint8_t *white, uint8_t *effect_data,
+                             const ESPColorCorrection *color_correction) {
+    this->red_ = red;
+    this->green_ = green;
+    this->blue_ = blue;
+    this->white_ = white;
+    this->effect_data_ = effect_data;
+    this->color_correction_ = color_correction;
+    return this;
+  }
+
+  Color get(int32_t index) const override {
+    return Color(this->get_red(index), this->get_green(index), this->get_blue(index), this->get_white(index));
+  }
+  Color get_raw(int32_t index) const override {
+    return Color(*this->red_, *this->green_, *this->blue_, this->white_ == nullptr ? 0 : *this->white_);
+  }
+  uint8_t get_red(int32_t index) const override { return this->color_correction_->color_uncorrect_red(*this->red_); }
+  uint8_t get_green(int32_t index) const override {
+    return this->color_correction_->color_uncorrect_green(*this->green_);
+  }
+  uint8_t get_blue(int32_t index) const override { return this->color_correction_->color_uncorrect_blue(*this->blue_); }
+  uint8_t get_white(int32_t index) const override {
+    return this->white_ == nullptr ? 0 : this->color_correction_->color_uncorrect_white(*this->white_);
+  }
+  uint8_t get_effect_data(int32_t index) const override {
+    return this->effect_data_ == nullptr ? 0 : *this->effect_data_;
+  }
+
+  void set(int32_t index, Color color) override {
+    this->set_red(index, color.red);
+    this->set_green(index, color.green);
+    this->set_blue(index, color.blue);
+    this->set_white(index, color.white);
+  }
+  void set_raw(int32_t index, Color raw_color) override {
+    *this->red_ = raw_color.red;
+    *this->green_ = raw_color.green;
+    *this->blue_ = raw_color.blue;
+    if (this->white_ != nullptr)
+      *this->white_ = raw_color.white;
+  }
+  void set_red(int32_t index, uint8_t red) override { *this->red_ = this->color_correction_->color_correct_red(red); }
+  void set_green(int32_t index, uint8_t green) override {
+    *this->green_ = this->color_correction_->color_correct_green(green);
+  }
+  void set_blue(int32_t index, uint8_t blue) override {
+    *this->blue_ = this->color_correction_->color_correct_blue(blue);
+  }
+  void set_white(int32_t index, uint8_t white) override {
+    if (this->white_ != nullptr)
+      *this->white_ = this->color_correction_->color_correct_white(white);
+  }
+  void set_effect_data(int32_t index, uint8_t value) override {
+    if (this->effect_data_ != nullptr)
+      *this->effect_data_ = value;
+  }
+
+#if defined(USE_LIGHT_PARTITION) && defined(USE_LIGHT_POWER_ESTIMATION)
+  const ESPColorCorrection *get_color_correction_internal(int32_t index) const override {
+    return this->color_correction_;
+  }
+#endif
+
+ protected:
+  uint8_t *red_{nullptr};
+  uint8_t *green_{nullptr};
+  uint8_t *blue_{nullptr};
+  uint8_t *white_{nullptr};
+  uint8_t *effect_data_{nullptr};
+  const ESPColorCorrection *color_correction_{nullptr};
+};
+#endif
+
 /// Abstract interface that supports setting colors and effect data.
 /// May set zero, one, or more pixels according to the implementation.
 class ESPColorSettable {
@@ -216,6 +298,14 @@ class ESPColorView final : public ESPColorSettable {
  public:
   ESPColorView(ESPColorAccessor *accessor, int32_t index) : accessor_(accessor), index_(index) {}
   ESPColorView(const ESPColorView &) = default;
+#ifdef USE_LIGHT_LEGACY_VIEW
+  ESPDEPRECATED("Set AddressableLight::accessor_ instead of overriding get_view_internal(). Removed in 2027.5.0",
+                "2026.11.0")
+  ESPColorView(uint8_t *red, uint8_t *green, uint8_t *blue, uint8_t *white, uint8_t *effect_data,
+               const ESPColorCorrection *color_correction)
+      : accessor_(PointerColorAccessor::scratch.bind(red, green, blue, white, effect_data, color_correction)),
+        index_(0) {}
+#endif
 
   inline ESPColorView &operator=(Color color) {
     this->set(color);
